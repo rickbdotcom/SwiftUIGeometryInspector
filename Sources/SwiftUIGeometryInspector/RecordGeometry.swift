@@ -13,15 +13,15 @@ public extension EnvironmentValues {
 
 public extension View {
 
-    func recordGeometry(_ id: String) -> some View {
-        modifier(RecordGeometryViewModifer(id: id))
+    func recordGeometry() -> some View {
+        modifier(RecordGeometryViewModifer())
     }
 }
 
 struct RecordGeometryViewModifer: ViewModifier {
     @Environment(\.inspectGeometry) private var inspectGeometry
     @Environment(\.geometryIdentifier) private var geometryIdentifier
-    let id: String
+    let id = UUID().uuidString
 
     func body(content: Content) -> some View {
         if inspectGeometry {

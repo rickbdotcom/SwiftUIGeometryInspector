@@ -39,6 +39,10 @@ struct InspectGeometryViewModifer: ViewModifier {
                                 }
                                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         }
+
+                        if let selectedNode {
+                            
+                        }
                     }
                     .contentShape(Rectangle())
                 }

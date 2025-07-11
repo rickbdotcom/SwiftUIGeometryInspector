@@ -23,15 +23,17 @@ struct ContentView: View {
                     Image(systemName: "globe")
                         .imageScale(.large)
                         .foregroundStyle(.tint)
-                        .recordGeometry("globe")
+                        .recordGeometry()
 
                     Text("Hello, world!")
-                        .recordGeometry("hello")
+                        .recordGeometry()
 
                     Text("Untracked")
                 }
             }
+            .recordGeometry()
             .padding()
+            .recordGeometry()
             .inspectGeometry(inspectGeometry)
         }
     }
