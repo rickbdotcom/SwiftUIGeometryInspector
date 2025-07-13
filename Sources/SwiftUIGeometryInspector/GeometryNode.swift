@@ -95,11 +95,14 @@ extension Sequence where Element == GeometryNode {
 
     func nearest(to node: GeometryNode, edge: Edge) -> (node: GeometryNode, edge: Edge)? {
         let distances = map {
-            ($0, abs(node.frame.distance(fromEdge: edge, to: $0.frame, toEdge: edge) * edge.direction), edge)
-        } + map {
-            ($0, abs(node.frame.distance(fromEdge: edge, to: $0.frame, toEdge: edge.opposite) * edge.direction), edge.opposite)
+            let d1 = ($0, node.frame.distance(fromEdge: edge, to: $0.frame, toEdge: edge) * edge.direction, edge)
+            let d2 = ($0, node.frame.distance(fromEdge: edge, to: $0.frame, toEdge: edge.opposite) * edge.direction, edge.opposite)
+            return abs(d1.1) < abs(d2.1) ? d1 : d2
         }
         if let found = distances.filter({ $0.1 >= 0 }).min(by: { $0.1 < $1.1 }) {
+            return (found.0, found.2)
+        }
+        if let found = distances.map({ ($0, abs($1), $2) }).min(by: { $0.1 < $1.1 }) {
             return (found.0, found.2)
         }
         return nil
