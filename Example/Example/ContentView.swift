@@ -15,25 +15,54 @@ struct ContentView: View {
         VStack {
             Toggle(isOn: $inspectGeometry) {
                 Text("Inspect Geometry")
-                    .padding()
             }
+            .padding()
+            VStack {
+                HStack {
+                    VStack(spacing: 16) {
+                        Image(systemName: "globe")
+                            .imageScale(.large)
+                            .foregroundStyle(.tint)
+                            .recordGeometry()
+                            .padding()
 
-            HStack {
-                VStack(spacing: 16) {
-                    Image(systemName: "globe")
-                        .imageScale(.large)
-                        .foregroundStyle(.tint)
+                        Text("Hello, world!")
+                            .fixedSize()
+                            .multilineTextAlignment(.leading)
+                            .recordGeometry()
+                            .padding(.horizontal)
+
+                        Text("Hello, galaxy!")
+                            .fixedSize()
+                            .multilineTextAlignment(.leading)
+                            .recordGeometry()
+
+                        Text("Untracked")
+                    }
+                    .recordGeometry()
+
+                    Text("Horizontal 1")
+                        .padding()
                         .recordGeometry()
 
-                    Text("Hello, world!")
+                    Text("Horizontal 2")
+                        .padding()
+                        .recordGeometry()
+                }
+                .recordGeometry()
+                .padding()
+                .recordGeometry()
+
+                HStack(spacing: -10) {
+                    Text("Overlap 1")
+                        .padding()
                         .recordGeometry()
 
-                    Text("Untracked")
+                    Text("Overlap 2")
+                        .padding()
+                        .recordGeometry()
                 }
             }
-            .recordGeometry()
-            .padding()
-            .recordGeometry()
             .inspectGeometry(inspectGeometry)
         }
     }
