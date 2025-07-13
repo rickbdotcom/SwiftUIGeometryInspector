@@ -42,10 +42,55 @@ struct GeometryNodeSpacing: Identifiable {
 extension Sequence where Element == GeometryNode {
 
     func spacing(from node: GeometryNode, edge: Edge) -> GeometryNodeSpacing? {
-        guard let found = excludeChildren(of: node).intersecting(node: node, on: edge.axis).nearest(to: node, edge: edge) else {
+        guard let found = nearest(to: node, edge: edge) else {
             return nil
         }
         return .init(from: node, fromEdge: edge, to: found.node, toEdge: found.edge)
+    }
+
+    func spacing(
+        from node: GeometryNode,
+        filter: (GeometryNode, GeometryNode, Edge) -> Bool = {
+            $0.frame.intersects($1.frame, on: $2.axis)
+        }
+    ) -> [GeometryNodeSpacing] {
+        let nodes = self.filter { $0 != node }
+        var top = nodes.filter { filter(node, $0, .top) }.spacing(from: node, edge: .top)
+        var bottom = nodes.filter { filter(node, $0, .bottom) }.spacing(from: node, edge: .bottom)
+        if let t = top, let b = bottom {
+            if t.to == b.to && t.toEdge == b.toEdge {
+                if abs(t.length) < abs(b.length) {
+                    bottom = nil
+                } else {
+                    top = nil
+                }
+            }
+        }
+        var leading = nodes.filter { filter(node, $0, .leading) }.spacing(from: node, edge: .leading)
+        var trailing = nodes.filter { filter(node, $0, .trailing) }.spacing(from: node, edge: .trailing)
+        if let l = leading, let t = trailing {
+            if l.to == t.to && t.toEdge == l.toEdge {
+                if abs(l.length) < abs(t.length) {
+                    trailing = nil
+                } else {
+                    leading = nil
+                }
+            }
+        }
+        var spacings = [GeometryNodeSpacing]()
+        if let top {
+            spacings.append(top)
+        }
+        if let bottom {
+            spacings.append(bottom)
+        }
+        if let leading {
+            spacings.append(leading)
+        }
+        if let trailing {
+            spacings.append(trailing)
+        }
+        return spacings
     }
 
     func nearest(to node: GeometryNode, edge: Edge) -> (node: GeometryNode, edge: Edge)? {
