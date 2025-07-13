@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-public extension EnvironmentValues {
+extension EnvironmentValues {
     @Entry var inspectGeometry: Bool = false
 }
 
@@ -24,16 +24,38 @@ struct InspectGeometryViewModifer: ViewModifier {
         didSet {
             var spacings = [GeometryNodeSpacing]()
             if let selectedNode {
-                if let top = nodes.top(from: selectedNode) {
+                var top = nodes.spacing(from: selectedNode, edge: .top)
+                var bottom = nodes.spacing(from: selectedNode, edge: .bottom)
+                if let t = top, let b = bottom {
+                    if t.to == b.to && t.toEdge == b.toEdge {
+                        if abs(t.length) < abs(b.length) {
+                            bottom = nil
+                        } else {
+                            top = nil
+                        }
+                    }
+                }
+                var leading = nodes.spacing(from: selectedNode, edge: .leading)
+                var trailing = nodes.spacing(from: selectedNode, edge: .trailing)
+                if let l = leading, let t = trailing {
+                    if l.to == t.to && t.toEdge == l.toEdge {
+                        if abs(l.length) < abs(t.length) {
+                            trailing = nil
+                        } else {
+                            leading = nil
+                        }
+                    }
+                }
+                if let top {
                     spacings.append(top)
                 }
-                if let bottom = nodes.bottom(from: selectedNode) {
+                if let bottom {
                     spacings.append(bottom)
                 }
-                if let leading = nodes.leading(from: selectedNode) {
+                if let leading {
                     spacings.append(leading)
                 }
-                if let trailing = nodes.trailing(from: selectedNode) {
+                if let trailing {
                     spacings.append(trailing)
                 }
                 self.spacings = spacings
@@ -42,9 +64,10 @@ struct InspectGeometryViewModifer: ViewModifier {
             }
         }
     }
+
     @State private var spacings: [GeometryNodeSpacing] = []
     var connectedNodes: [GeometryNode] {
-        spacings.map { $0.connectedNode }
+        spacings.map { $0.to }
     }
     let enable: Bool
     
@@ -96,6 +119,14 @@ struct InspectGeometryViewModifer: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+struct GeometryNodePreferenceKey: PreferenceKey {
+    static let defaultValue: [GeometryNode] = []
+
+    static func reduce(value: inout [GeometryNode], nextValue: () -> [GeometryNode]) {
+        value += nextValue()
     }
 }
 

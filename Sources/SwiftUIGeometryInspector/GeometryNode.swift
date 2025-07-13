@@ -7,50 +7,80 @@
 
 import SwiftUI
 
-public struct GeometryNode: Equatable, Identifiable, Sendable {
-    public let parentId: String?
-    public let id: String
-    public let frame: CGRect
+struct GeometryNode: Equatable, Identifiable, Sendable {
+    let parentId: String?
+    let id: String
+    let frame: CGRect
 }
 
 struct GeometryNodeSpacing: Identifiable {
-    let node: GeometryNode
-    let connectedNode: GeometryNode
-    let start: CGPoint
-    let end: CGPoint
-    let length: CGFloat
+    let from: GeometryNode
+    let to: GeometryNode
+    let fromEdge: Edge
+    let toEdge: Edge
+    var start: CGPoint {
+        from.frame.edgePoint(fromEdge)
+    }
+    var end: CGPoint {
+        to.frame.edgePoint(toEdge, from: self.start)
+    }
+    var length: CGFloat {
+        from.frame.distance(fromEdge: fromEdge, to: to.frame, toEdge: toEdge) * fromEdge.direction
+    }
     var id: String {
-        "\(node.id)-\(connectedNode.id):\(start)\(end)"
+        "\(from.id):\(fromEdge.rawValue)-\(to.id):\(toEdge.rawValue)"
     }
 
-    init?(
-        node: GeometryNode,
-        x: CGFloat? = nil,
-        y: CGFloat? = nil,
-        _ line: (GeometryNode, (CGFloat, CGFloat))?
-    ) {
-        guard let line else {
-            return nil
-        }
-        self.node = node
-        self.connectedNode = line.0
-        self.start = .init(x: x ?? line.1.0, y: y ?? line.1.0)
-        self.end = .init(x: x ?? line.1.1, y: y ?? line.1.1)
-        self.length = line.1.0 - line.1.1
+    init(from: GeometryNode, fromEdge: Edge, to: GeometryNode, toEdge: Edge) {
+        self.from = from
+        self.to = to
+        self.fromEdge = fromEdge
+        self.toEdge = toEdge
     }
 }
 
 extension Sequence where Element == GeometryNode {
 
+    func spacing(from node: GeometryNode, edge: Edge) -> GeometryNodeSpacing? {
+        guard let found = excludeChildren(of: node).intersecting(node: node, on: edge.axis).nearest(to: node, edge: edge) else {
+            return nil
+        }
+        return .init(from: node, fromEdge: edge, to: found.node, toEdge: found.edge)
+    }
+
+    func nearest(to node: GeometryNode, edge: Edge) -> (node: GeometryNode, edge: Edge)? {
+        let distances = map {
+            ($0, abs(node.frame.distance(fromEdge: edge, to: $0.frame, toEdge: edge) * edge.direction), edge)
+        } + map {
+            ($0, abs(node.frame.distance(fromEdge: edge, to: $0.frame, toEdge: edge.opposite) * edge.direction), edge.opposite)
+        }
+        if let found = distances.filter({ $0.1 >= 0 }).min(by: { $0.1 < $1.1 }) {
+            return (found.0, found.2)
+        }
+        return nil
+    }
+
+    func intersecting(node: GeometryNode, on axis: Axis) -> [GeometryNode] {
+        filter {
+            $0.frame.intersects(node.frame, on: axis) && $0 != node
+        }
+    }
+
+    func excludeChildren(of node: GeometryNode) -> [GeometryNode] {
+        filter {
+            $0.parentId != node.id && $0 != node
+        }
+    }
+
     func siblings(of node: GeometryNode) -> [GeometryNode] {
         filter {
-            $0.id != node.id && ($0.parentId == node.parentId)
+            ($0.parentId == node.parentId) && $0 != node
         }
     }
 
     func parent(of node: GeometryNode) -> [GeometryNode] {
         filter {
-            $0.id == node.parentId
+            $0.id == node.parentId && $0 != node
         }
     }
 
@@ -60,70 +90,101 @@ extension Sequence where Element == GeometryNode {
         }
         return zIndex(of: parent(of: node).first) + 1.0
     }
+}
 
-    func find(_ line: (GeometryNode) -> (CGFloat, CGFloat)) -> (GeometryNode, (CGFloat, CGFloat))? {
-        map {
-            ($0, line($0))
-        }.filter {
-            $0.1.0 - $0.1.1 > 0
-        }.min {
-            ($0.1.0 - $0.1.1) < ($1.1.0 - $1.1.1)
+
+extension CGRect {
+
+    func intersects(_ rect: CGRect, on axis: Axis) -> Bool {
+        switch axis {
+        case .horizontal:
+            (minY...maxY).contains(rect.minY) || (minY...maxY).contains(rect.maxY) ||
+            (rect.minY...rect.maxY).contains(minY) || (rect.minY...rect.maxY).contains(maxY)
+        case .vertical:
+            (minX...maxX).contains(rect.minX) || (minX...maxX).contains(rect.maxX) ||
+            (rect.minX...rect.maxX).contains(minX) || (rect.minX...rect.maxX).contains(maxX)
         }
     }
 
-    func top(from node: GeometryNode) -> GeometryNodeSpacing? {
-        .init(
-            node: node,
-            x: node.frame.midX,
-            siblings(of: node).find {
-                (node.frame.minY, $0.frame.maxY)
-            } ?? parent(of: node).find {
-                (node.frame.minY, $0.frame.minY)
-            }
-        )
+    func edges(from axis: Axis) -> (CGFloat, CGFloat) {
+        switch axis {
+        case .horizontal:
+            (minX, maxX)
+        case .vertical:
+            (minY, maxY)
+        }
     }
 
-    func bottom(from node: GeometryNode) -> GeometryNodeSpacing? {
-        .init(
-            node: node,
-            x: node.frame.midX,
-            siblings(of: node).find {
-                ($0.frame.minY, node.frame.maxY)
-            } ?? parent(of: node).find {
-                ($0.frame.maxY, node.frame.maxY)
-            }
-        )
+    func edge(_ edge: Edge) -> CGFloat {
+        switch edge {
+        case .leading:
+            minX
+        case .trailing:
+            maxX
+        case .top:
+            minY
+        case .bottom:
+            maxY
+        }
     }
 
-    func leading(from node: GeometryNode) -> GeometryNodeSpacing? {
-        .init(
-            node: node,
-            y: node.frame.midY,
-            siblings(of: node).find {
-                (node.frame.minX, $0.frame.maxX)
-            } ?? parent(of: node).find {
-                (node.frame.minX, $0.frame.minX)
-            }
-        )
+    func distance(fromEdge: Edge, to: Self, toEdge: Edge) -> CGFloat {
+        to.edge(toEdge) - edge(fromEdge)
     }
 
-    func trailing(from node: GeometryNode) -> GeometryNodeSpacing? {
-        .init(
-            node: node,
-            y: node.frame.midY,
-            siblings(of: node).find {
-                ($0.frame.minX, node.frame.maxX)
-            } ?? parent(of: node).find {
-                ($0.frame.maxX , node.frame.maxX)
-            }
-        )
+    func edgePoint(_ edge: Edge) -> CGPoint {
+        switch edge.axis {
+        case .horizontal:
+            .init(x: self.edge(edge), y: self.midY)
+        case.vertical:
+            .init(x: self.midX, y: self.edge(edge))
+        }
+    }
+
+    func edgePoint(_ edge: Edge, from: CGPoint) -> CGPoint {
+        switch edge.axis {
+        case .horizontal:
+            .init(x: self.edge(edge), y: from.y)
+        case.vertical:
+            .init(x: from.x, y: self.edge(edge))
+        }
     }
 }
 
-public struct GeometryNodePreferenceKey: PreferenceKey {
-    public static let defaultValue: [GeometryNode] = []
+extension Edge {
 
-    public static func reduce(value: inout [GeometryNode], nextValue: () -> [GeometryNode]) {
-        value += nextValue()
+    var direction: Double {
+        switch self {
+        case .leading:
+            -1
+        case .trailing:
+            1
+        case .top:
+            -1
+        case .bottom:
+            1
+        }
+    }
+
+    var opposite: Edge {
+        switch self {
+        case .leading:
+            .trailing
+        case .trailing:
+            .leading
+        case .top:
+            .bottom
+        case .bottom:
+            .top
+        }
+    }
+
+    var axis: Axis {
+        switch self {
+        case .leading, .trailing:
+            .horizontal
+        case .top, .bottom:
+            .vertical
+        }
     }
 }
